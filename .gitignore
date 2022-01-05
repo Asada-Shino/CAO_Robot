@@ -1,6 +1,6 @@
-.vscode/
-CMakeFiles/
-build/
-config/
-mirai-cpp/
-include/information.hpp
+/.vscode/
+/CMakeFiles/
+/build/
+/config/
+/mirai-cpp/
+/include/information.hpp
