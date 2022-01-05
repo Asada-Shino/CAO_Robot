@@ -14,7 +14,7 @@ CAORobot::CAORobot() {
 
 void CAORobot::init() {
     module.init();
-	while (true)
+	for(int i = 0; i < 3; ++i)
 	{
 		try
 		{
