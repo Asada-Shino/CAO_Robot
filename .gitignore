@@ -1,7 +1,5 @@
 .vscode/
 CMakeFiles/
+build/
 include/information.hpp
-cmake_install.cmake
-CMakeCache.txt
 config.json
-Makefile
