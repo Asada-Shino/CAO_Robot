@@ -4,7 +4,7 @@
 Module::Module() {}
 
 void Module::init() {
-    fstream f("config.json");
+    fstream f("config/config.json");
     if(f.fail())
         throw "can't find config.json";
     string config_s;
