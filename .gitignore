@@ -1,5 +1,6 @@
 .vscode/
 CMakeFiles/
 build/
+config/
+mirai-cpp/
 include/information.hpp
-config.json
