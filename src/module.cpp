@@ -101,9 +101,6 @@ void Module::deal_group_message(GroupMessage m) {
         if(enabled_group_list.count(m.Sender.Group.GID) > 0) {
             vector<string> cmd;
             command_parser(cmd, m.MessageChain.GetPlainText());
-            for(auto s : cmd) {
-                cout << s << endl;
-            }
             if(cmd.size() == 2 && cmd[0] == "enable") {
                 if(enable(m.Sender.Group, m.Sender, cmd[1]))
                     m.QuoteReply(MessageChain().Plain("功能\""+cmd[1]+"\"已启用。"));
