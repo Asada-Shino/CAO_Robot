@@ -2,10 +2,10 @@
 ## Todo:
 ### Module:
 - [x] init from file (load super admin and group settings)
-- [ ] parse commands
+- [x] parse commands
 - [ ] anti-recall
 - [ ] repeat count
-- [ ] ban & kick command
+- [x] ban & kick command
 ### Bot:
 - [x] auto connect and init module part
 - [ ] anti-ban (avoid being banned by 10cent)
