@@ -4,7 +4,7 @@
 - [x] init from file (load super admin and group settings)
 - [ ] parse commands
 - [ ] anti-recall
-- [ ] repeat machine
+- [ ] repeat count
 - [ ] ban & kick command
 ### Bot:
 - [x] auto connect and init module part
