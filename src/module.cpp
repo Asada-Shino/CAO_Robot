@@ -1,6 +1,7 @@
 #include "module.hpp"
 #include "information.hpp"
 #include <fstream>
+#include <ctime>
 
 Module::Module() {
     opts.BotQQ = BOT_QQ;				
@@ -105,17 +106,22 @@ void Module::deal_group_message(GroupMessage m) {
             }
             if(cmd.size() == 2 && cmd[0] == "enable") {
                 if(enable(m.Sender.Group, m.Sender, cmd[1]))
-                    m.QuoteReply(MessageChain().Plain(cmd[1]+"功能已启用。"));
+                    m.QuoteReply(MessageChain().Plain("功能\""+cmd[1]+"\"已启用。"));
             }
             else if(cmd.size() == 2 && cmd[0] == "disable") {
                 if(disable(m.Sender.Group, m.Sender, cmd[1]))
-                    m.QuoteReply(MessageChain().Plain(cmd[1]+"功能已禁用。"));
+                    m.QuoteReply(MessageChain().Plain("功能\""+cmd[1]+"\"已禁用。"));
             }
             else if(cmd.size() >= 2 && cmd[0] == "ban" && group_settings[m.Sender.Group.GID]["ban"] == true) {
                 ban(m.Sender.Group, m.Sender, m.MessageChain.GetFirst<AtMessage>().Target(), stol(cmd[1]), cmd.size() >=3?cmd[2]:"");
             }
             else if(cmd.size() >= 1 && cmd[0] == "kick" && group_settings[m.Sender.Group.GID]["kick"] == true) {
                 kick(m.Sender.Group, m.Sender, m.MessageChain.GetFirst<AtMessage>().Target(), cmd.size() >= 2? cmd[1] : "");
+            }
+            else if(group_settings[m.Sender.Group.GID]["repeat-analysis"] == true) {
+                optional<MessageChain> mc = repeat_analysis(m.Sender.Group, m.Sender, m.MessageChain, m.Timestamp());
+                if(mc != nullopt)
+                    m.Reply(mc.value());
             }
         }
     }
@@ -176,4 +182,38 @@ void Module::kick(Group_t& group, GroupMember& sender, QQ_t target, string reaso
     if((sender.Permission >= GroupPermission::Administrator || super_admin_list.count(sender.QQ) > 0) && super_admin_list.count(target) == 0) {
         bot.Kick(group.GID, target);
     }
+}
+
+optional<MessageChain> Module::repeat_analysis(Group_t& group, GroupMember& sender, MessageChain msg, time_t timestamp) {
+    static map<GID_t, pair<MessageChain, time_t>> last_text_map;
+    static map<GID_t, set<QQ_t>> repeat_count; 
+    if(repeat_count.find(group.GID) == repeat_count.end())
+        repeat_count[group.GID] = set<QQ_t>();
+    auto &qq_set = repeat_count[group.GID];
+    if(last_text_map.find(group.GID) == last_text_map.end()) {
+        last_text_map[group.GID] = pair<MessageChain, time_t>(msg, timestamp);
+        qq_set.insert(sender.QQ);
+        return nullopt;
+    }
+    cout << "last: "<< last_text_map[group.GID].first.ToString() <<"\nnow: " << msg.ToString() << "\nCompare: " << (last_text_map[group.GID].first == msg) << endl;
+    
+    if(last_text_map[group.GID].first == msg) {
+        if(qq_set.find(sender.QQ) == qq_set.end())
+            qq_set.insert(sender.QQ);
+    }
+    else {
+        MessageChain mc;
+        if(qq_set.size() >= 3) {
+            mc = MessageChain().Plain("本次接龙内容：")+last_text_map[group.GID].first+
+            MessageChain().Plain("\n共计"+to_string(qq_set.size())+"人参与\n历时"+to_string(timestamp - last_text_map[group.GID].second)+"秒");
+            last_text_map[group.GID] = pair<MessageChain, time_t>(msg, timestamp);
+            qq_set.clear();
+            qq_set.insert(sender.QQ);
+            return mc;
+        }
+        last_text_map[group.GID] = pair<MessageChain, time_t>(msg, timestamp);
+        qq_set.clear();
+        qq_set.insert(sender.QQ);
+    }
+    return nullopt;
 }
