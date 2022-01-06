@@ -195,8 +195,6 @@ optional<MessageChain> Module::repeat_analysis(Group_t& group, GroupMember& send
         qq_set.insert(sender.QQ);
         return nullopt;
     }
-    cout << "last: "<< last_text_map[group.GID].first.ToString() <<"\nnow: " << msg.ToString() << "\nCompare: " << (last_text_map[group.GID].first == msg) << endl;
-    
     if(last_text_map[group.GID].first == msg) {
         if(qq_set.find(sender.QQ) == qq_set.end())
             qq_set.insert(sender.QQ);
