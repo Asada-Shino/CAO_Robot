@@ -10,7 +10,5 @@ public:
     void init();
     void release();
 private:
-    MiraiBot bot;
-    SessionOptions opts;
     Module module;
 };
