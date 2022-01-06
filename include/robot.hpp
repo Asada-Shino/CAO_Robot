@@ -8,6 +8,7 @@ class CAORobot {
 public:
     CAORobot();
     void init();
+    void release();
 private:
     MiraiBot bot;
     SessionOptions opts;
