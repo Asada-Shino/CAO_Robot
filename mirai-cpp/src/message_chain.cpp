@@ -1,7 +1,6 @@
 #include "mirai/defs/message_chain.hpp"
 #include "mirai/defs/simple_reflect.hpp"
 #include "mirai/messages/messages.hpp"
-
 namespace Cyan
 {
 
@@ -81,7 +80,8 @@ namespace Cyan
 		if (this->messages_.size() != mc.messages_.size()) return false;
 		for (size_t i = 0; i < messages_.size(); ++i)
 		{
-			if (messages_[i] != mc.messages_[i]) return false;
+			if (*messages_[i] != *mc.messages_[i])
+				return false;
 		}
 		return true;
 	}
