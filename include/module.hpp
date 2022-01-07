@@ -17,8 +17,7 @@ private:
 private:
     void load_config_file();
     void save_config_file();
-    bool enable(Group_t& group, GroupMember& sender, string func_name);
-    bool disable(Group_t& group, GroupMember& sender, string func_name);
+    int change_funcs(Group_t& group, GroupMember& sender, string func_name, bool enable);
     void kick(Group_t& group, GroupMember& sender, QQ_t target, string reason);
     void ban(Group_t& group, GroupMember& sender, QQ_t target, int time, string reason);
     void command_parser(vector<string>& cmd, string plain_text);

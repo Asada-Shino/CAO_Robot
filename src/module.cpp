@@ -1,5 +1,6 @@
 #include "module.hpp"
 #include "information.hpp"
+#include "utils.hpp"
 #include <fstream>
 #include <ctime>
 
@@ -101,16 +102,13 @@ void Module::deal_group_message(GroupMessage m) {
         if(enabled_group_list.count(m.Sender.Group.GID) > 0) {
             vector<string> cmd;
             command_parser(cmd, m.MessageChain.GetPlainText());
-            if(cmd.size() == 2 && cmd[0] == "enable") {
-                if(enable(m.Sender.Group, m.Sender, cmd[1]))
-                    m.QuoteReply(MessageChain().Plain("功能\""+cmd[1]+"\"已启用。"));
-            }
-            else if(cmd.size() == 2 && cmd[0] == "disable") {
-                if(disable(m.Sender.Group, m.Sender, cmd[1]))
-                    m.QuoteReply(MessageChain().Plain("功能\""+cmd[1]+"\"已禁用。"));
+            if(cmd.size() == 2 && (cmd[0] == "enable" || cmd[0] == "disable")) {
+                int count = change_funcs(m.Sender.Group, m.Sender, cmd[1], cmd[0] == "enable");
+                if(count > 0)
+                    m.QuoteReply(MessageChain().Plain((cmd[0] == "enable" ? "已启用" : "已禁用") +to_string(count)+"项功能。"));
             }
             else if(cmd.size() >= 2 && cmd[0] == "ban" && group_settings[m.Sender.Group.GID]["ban"] == true) {
-                ban(m.Sender.Group, m.Sender, m.MessageChain.GetFirst<AtMessage>().Target(), stol(cmd[1]), cmd.size() >=3?cmd[2]:"");
+                ban(m.Sender.Group, m.Sender, m.MessageChain.GetFirst<AtMessage>().Target(),string_to_duration(cmd[1]), cmd.size() >=3?cmd[2]:"");
             }
             else if(cmd.size() >= 1 && cmd[0] == "kick" && group_settings[m.Sender.Group.GID]["kick"] == true) {
                 kick(m.Sender.Group, m.Sender, m.MessageChain.GetFirst<AtMessage>().Target(), cmd.size() >= 2? cmd[1] : "");
@@ -127,22 +125,25 @@ void Module::deal_group_message(GroupMessage m) {
 		}
 }
 
-bool Module::enable(Group_t& group, GroupMember& sender, string func_name) {
-    if(super_admin_list.count(sender.QQ) > 0 && func_names.count(func_name) > 0 && group_settings[group.GID][func_name] == false) {
-        group_settings[group.GID][func_name] = true;
-        config["group_settings"][to_string(group.GID.ToInt64())][func_name] = true;
-        return true;
+int Module::change_funcs(Group_t& group, GroupMember& sender, string func_name, bool enable) {
+    if(super_admin_list.count(sender.QQ) > 0) {
+        if(func_name == "all") {
+            int count = 0;
+            for(auto func : func_names)
+                if(group_settings[group.GID][func] == !enable) {
+                    group_settings[group.GID][func] = enable;
+                    config["group_settings"][to_string(group.GID.ToInt64())][func] = enable;
+                    ++count;
+                }
+            return count;
+        }
+        else if(func_names.count(func_name) > 0 && group_settings[group.GID][func_name] == !enable) {
+            group_settings[group.GID][func_name] = enable;
+            config["group_settings"][to_string(group.GID.ToInt64())][func_name] = enable;
+            return 1;
+        }  
     }
-    return false;
-}
-
-bool Module::disable(Group_t& group, GroupMember& sender, string func_name) {
-    if(super_admin_list.count(sender.QQ) > 0 && func_names.count(func_name) > 0 && group_settings[group.GID][func_name] == true) {
-        group_settings[group.GID][func_name] = false;
-        config["group_settings"][to_string(group.GID.ToInt64())][func_name] = false;
-        return true;
-    }
-    return false;
+    return 0;
 }
 
 void Module::command_parser(vector<string>& cmd, string plain_text) {
@@ -166,12 +167,12 @@ void Module::command_parser(vector<string>& cmd, string plain_text) {
         cmd.push_back(plain_text.substr(start));
 }
 
-void Module::ban(Group_t& group, GroupMember& sender, QQ_t target, int minute, string reason) {
+void Module::ban(Group_t& group, GroupMember& sender, QQ_t target, int seconds, string reason) {
     if((sender.Permission >= GroupPermission::Administrator || super_admin_list.count(sender.QQ) > 0) && super_admin_list.count(target) == 0) {
-        if(minute == 0)
+        if(seconds == 0)
             bot.UnMute(group.GID, target);
-        if(minute > 0 && minute <= 43200)
-        bot.Mute(group.GID, target, minute*60);
+        if(seconds > 0 && seconds <= 43200*60)
+        bot.Mute(group.GID, target, seconds);
     }
 }
 
@@ -200,7 +201,7 @@ optional<MessageChain> Module::repeat_analysis(Group_t& group, GroupMember& send
         MessageChain mc;
         if(qq_set.size() >= 3) {
             mc = MessageChain().Plain("本次接龙内容：")+last_text_map[group.GID].first+
-            MessageChain().Plain("\n共计"+to_string(qq_set.size())+"人参与\n历时"+to_string(timestamp - last_text_map[group.GID].second)+"秒");
+            MessageChain().Plain("\n共计"+to_string(qq_set.size())+"人参与\n历时"+duration_to_string(timestamp - last_text_map[group.GID].second, false));
             last_text_map[group.GID] = pair<MessageChain, time_t>(msg, timestamp);
             qq_set.clear();
             qq_set.insert(sender.QQ);
