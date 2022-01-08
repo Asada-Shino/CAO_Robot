@@ -22,7 +22,7 @@ private:
     void ban(Group_t& group, GroupMember& sender, QQ_t target, int seconds, string reason);
     void offer(Group_t& group, GroupMember& sender, int seconds, string reason);
     void command_parser(vector<string>& cmd, string plain_text);
-    void nonsense(Group_t& group, time_t timestamp);
+    optional<string> nonsense(Group_t& group, time_t timestamp);
     optional<MessageChain> repeat_analysis(Group_t& group, GroupMember& sender, MessageChain msg, time_t timestamp);
 public:
     Module();

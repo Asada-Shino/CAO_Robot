@@ -50,6 +50,7 @@ void Module::init() {
 		});
 
     load_config_file();
+    srand(time(0));
 }
 
 void Module::load_config_file() {
@@ -100,8 +101,6 @@ void Module::release() {
 void Module::deal_group_message(GroupMessage m) {
     try {
         if(enabled_group_list.count(m.Sender.Group.GID) > 0) {
-            cout << m.MessageChain.ToString() << endl;
-            cout << m.ToString() << endl;
             vector<string> cmd;
             command_parser(cmd, m.MessageChain.GetPlainText());
             if(cmd.size() == 2 && (cmd[0] == "enable" || cmd[0] == "disable")) {
@@ -117,6 +116,11 @@ void Module::deal_group_message(GroupMessage m) {
             }
             else if(cmd.size() >= 1 && cmd[0] == "kick" && group_settings[m.Sender.Group.GID]["kick"] == true) {
                 kick(m.Sender.Group, m.Sender, m.MessageChain.GetFirst<AtMessage>().Target(), cmd.size() >= 2? cmd[1] : "");
+            }
+            else if(cmd.size() >= 1 && cmd[0] == "nonsense" && group_settings[m.Sender.Group.GID]["nonsense"] == true) {
+                optional<string> s = nonsense(m.Sender.Group, m.Timestamp());
+                if(s!=nullopt)
+                    m.Reply(MessageChain().Plain(s.value()));
             }
             else if(group_settings[m.Sender.Group.GID]["repeat-analysis"] == true) {
                 optional<MessageChain> mc = repeat_analysis(m.Sender.Group, m.Sender, m.MessageChain, m.Timestamp());
@@ -179,12 +183,21 @@ void Module::offer(Group_t& group, GroupMember& sender, int seconds, string reas
     }
 }
 
-void Module::nonsense(Group_t& group, time_t timestamp) {
+optional<string> Module::nonsense(Group_t& group, time_t timestamp) {
     static time_t last_time = 0;
     if(timestamp - last_time > 10) {
         last_time = timestamp;
-        
+        fstream f("config/nonsense.txt");
+        string sentence = "";
+        int n = rand()%1222;
+        for(int i = n; i >= 0; --i) {
+            f >> sentence;
+        }
+        if(sentence != "") {
+            return sentence+"\n\n——第"+to_string(n+1)+"条毒鸡汤";
+        }
     }
+    return nullopt;
     
 }
 
