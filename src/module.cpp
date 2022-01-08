@@ -189,10 +189,11 @@ optional<string> Module::nonsense(Group_t& group, time_t timestamp) {
         last_time = timestamp;
         fstream f("config/nonsense.txt");
         string sentence = "";
-        int n = rand()%1222;
+        int n = rand()%1221;
         for(int i = n; i >= 0; --i) {
             f >> sentence;
         }
+        f.close();
         if(sentence != "") {
             return sentence+"\n\n——第"+to_string(n+1)+"条毒鸡汤";
         }
