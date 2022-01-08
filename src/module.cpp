@@ -100,6 +100,8 @@ void Module::release() {
 void Module::deal_group_message(GroupMessage m) {
     try {
         if(enabled_group_list.count(m.Sender.Group.GID) > 0) {
+            cout << m.MessageChain.ToString() << endl;
+            cout << m.ToString() << endl;
             vector<string> cmd;
             command_parser(cmd, m.MessageChain.GetPlainText());
             if(cmd.size() == 2 && (cmd[0] == "enable" || cmd[0] == "disable")) {
@@ -109,6 +111,9 @@ void Module::deal_group_message(GroupMessage m) {
             }
             else if(cmd.size() >= 2 && cmd[0] == "ban" && group_settings[m.Sender.Group.GID]["ban"] == true) {
                 ban(m.Sender.Group, m.Sender, m.MessageChain.GetFirst<AtMessage>().Target(),string_to_duration(cmd[1]), cmd.size() >=3?cmd[2]:"");
+            }
+            else if(cmd.size() >= 2 && cmd[0] == "offer" && group_settings[m.Sender.Group.GID]["offer"] == true) {
+                offer(m.Sender.Group, m.Sender, string_to_duration(cmd[1]), cmd.size() >=3?cmd[2]:"");
             }
             else if(cmd.size() >= 1 && cmd[0] == "kick" && group_settings[m.Sender.Group.GID]["kick"] == true) {
                 kick(m.Sender.Group, m.Sender, m.MessageChain.GetFirst<AtMessage>().Target(), cmd.size() >= 2? cmd[1] : "");
@@ -167,6 +172,22 @@ void Module::command_parser(vector<string>& cmd, string plain_text) {
         cmd.push_back(plain_text.substr(start));
 }
 
+void Module::offer(Group_t& group, GroupMember& sender, int seconds, string reason) {
+    if(sender.Permission == GroupPermission::Member) {
+        if(seconds > 0 && seconds <= 43200*60)
+            bot.Mute(group.GID, sender.QQ, seconds);
+    }
+}
+
+void Module::nonsense(Group_t& group, time_t timestamp) {
+    static time_t last_time = 0;
+    if(timestamp - last_time > 10) {
+        last_time = timestamp;
+        
+    }
+    
+}
+
 void Module::ban(Group_t& group, GroupMember& sender, QQ_t target, int seconds, string reason) {
     if((sender.Permission >= GroupPermission::Administrator || super_admin_list.count(sender.QQ) > 0) && super_admin_list.count(target) == 0) {
         if(seconds == 0)
@@ -185,6 +206,7 @@ void Module::kick(Group_t& group, GroupMember& sender, QQ_t target, string reaso
 optional<MessageChain> Module::repeat_analysis(Group_t& group, GroupMember& sender, MessageChain msg, time_t timestamp) {
     static map<GID_t, pair<MessageChain, time_t>> last_text_map;
     static map<GID_t, set<QQ_t>> repeat_count; 
+    // TODO: 排除Marketface 不支持的表情
     if(repeat_count.find(group.GID) == repeat_count.end())
         repeat_count[group.GID] = set<QQ_t>();
     auto &qq_set = repeat_count[group.GID];

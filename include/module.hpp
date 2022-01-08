@@ -4,7 +4,7 @@
 using namespace std;
 using namespace Cyan;
 
-const set<string> func_names = {"anti-recall", "repeat-analysis", "ban", "kick"};
+const set<string> func_names = {"anti-recall", "repeat-analysis", "ban", "kick", "offer", "nonsense"};
 class Module {
 private:
     map<GID_t, map<string, bool>> group_settings;
@@ -19,8 +19,10 @@ private:
     void save_config_file();
     int change_funcs(Group_t& group, GroupMember& sender, string func_name, bool enable);
     void kick(Group_t& group, GroupMember& sender, QQ_t target, string reason);
-    void ban(Group_t& group, GroupMember& sender, QQ_t target, int time, string reason);
+    void ban(Group_t& group, GroupMember& sender, QQ_t target, int seconds, string reason);
+    void offer(Group_t& group, GroupMember& sender, int seconds, string reason);
     void command_parser(vector<string>& cmd, string plain_text);
+    void nonsense(Group_t& group, time_t timestamp);
     optional<MessageChain> repeat_analysis(Group_t& group, GroupMember& sender, MessageChain msg, time_t timestamp);
 public:
     Module();
