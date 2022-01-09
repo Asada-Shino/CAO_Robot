@@ -157,7 +157,7 @@ int Module::change_funcs(Group_t& group, GroupMember& sender, string func_name, 
 
 void Module::command_parser(vector<string>& cmd, string plain_text) {
     int start = 0;
-    bool blank = false;
+    bool blank = true;
     for(int i = 0 ; i < plain_text.length(); ++i) {
         if(plain_text[i] == ' ' || plain_text[i] == '\n') {
             if(blank == false) {
