@@ -44,6 +44,22 @@ int string_to_duration(string s) {
         }
     }
     if(num > 0)
-        res+=num*60;
+        res+=num;
     return res;
+}
+
+string add_zero(int t) {
+        return t<10 ? "0"+to_string(t) : to_string(t);
+    }
+
+string get_date(string seperator) {
+    time_t now_c = time(0);
+    tm now_tm = *localtime(&now_c);
+    return to_string(now_tm.tm_year+1900)+seperator+add_zero(now_tm.tm_mon+1)+seperator+add_zero(now_tm.tm_mday);
+}
+
+string get_time() {
+    time_t now_c = time(0);
+    tm now_tm = *localtime(&now_c);
+    return add_zero(now_tm.tm_hour)+":"+add_zero(now_tm.tm_min)+":"+add_zero(now_tm.tm_sec);
 }
