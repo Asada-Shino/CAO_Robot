@@ -14,6 +14,7 @@ Module::Module() {
 }
 
 void Module::init() {
+    logger.init();
     while(true)
 	{
 		try
@@ -56,7 +57,7 @@ void Module::init() {
 void Module::load_config_file() {
     fstream f("config/config.json");
     if(f.fail())
-        throw "can't find config.json";
+        throw runtime_error("can't find config.json");
     string config_s;
     while(!f.eof()) {
         string s;
@@ -83,6 +84,9 @@ void Module::load_config_file() {
             group[func] = config["group_settings"][group_s][func];
         }
     }
+    for(auto func : func_names) {
+        interval[func] = (config["interval"][func] == nullptr ? (config["interval"][func] = 0) :  config["interval"][func]);
+    }
 }
 
 void Module::save_config_file() {
@@ -96,11 +100,13 @@ void Module::save_config_file() {
 void Module::release() {
 	bot.Disconnect();
     save_config_file();
+    logger.release();
 }
 
 void Module::deal_group_message(GroupMessage m) {
     try {
         if(enabled_group_list.count(m.Sender.Group.GID) > 0) {
+            logger.info("["+m.Sender.Group.Name+"("+to_string(m.Sender.Group.GID.ToInt64())+")] " + m.Sender.MemberName+"("+to_string(m.Sender.QQ.ToInt64())+") ["+to_string(m.MessageId())+"]: "+m.MessageChain.ToString());
             vector<string> cmd;
             command_parser(cmd, m.MessageChain.GetPlainText());
             if(cmd.size() == 2 && (cmd[0] == "enable" || cmd[0] == "disable")) {
@@ -121,6 +127,11 @@ void Module::deal_group_message(GroupMessage m) {
                 optional<string> s = nonsense(m.Sender.Group, m.Timestamp());
                 if(s!=nullopt)
                     m.Reply(MessageChain().Plain(s.value()));
+            }
+            else if(cmd.size() >= 1 && cmd[0] == "pica" && group_settings[m.Sender.Group.GID]["pica"] == true) {
+                optional<MessageChain> s = pica(m.Sender.Group, m.Timestamp());
+                if(s!=nullopt)
+                    m.Reply(s.value());
             }
             else if(group_settings[m.Sender.Group.GID]["repeat-analysis"] == true) {
                 optional<MessageChain> mc = repeat_analysis(m.Sender.Group, m.Sender, m.MessageChain, m.Timestamp());
@@ -185,17 +196,17 @@ void Module::offer(Group_t& group, GroupMember& sender, int seconds, string reas
 
 optional<string> Module::nonsense(Group_t& group, time_t timestamp) {
     static time_t last_time = 0;
-    if(timestamp - last_time > 10) {
+    if(timestamp - last_time >= 10) {
         last_time = timestamp;
-        fstream f("config/nonsense.txt");
+        fstream f("text/nonsense.txt");
         string sentence = "";
-        int n = rand()%1221;
+        int n = rand()%1220;
         for(int i = n; i >= 0; --i) {
             f >> sentence;
         }
         f.close();
         if(sentence != "") {
-            return sentence+"\n\n——第"+to_string(n+1)+"条毒鸡汤";
+            return sentence+" [id:"+to_string(n+1)+"]";
         }
     }
     return nullopt;
@@ -246,6 +257,22 @@ optional<MessageChain> Module::repeat_analysis(Group_t& group, GroupMember& send
         last_text_map[group.GID] = pair<MessageChain, time_t>(msg, timestamp);
         qq_set.clear();
         qq_set.insert(sender.QQ);
+    }
+    return nullopt;
+}
+
+optional<MessageChain> Module::pica(Group_t& group, time_t timestamp) {
+    static time_t last_time = 0;
+    static time_t last_info_time = 0;
+    if(timestamp - last_time >= 60) {
+        last_time = timestamp;
+        int n = rand()%1000+1;
+        GroupImage img = bot.UploadGroupImage("img/"+to_string(n)+".jpg");
+        return MessageChain().Image(img);
+    }
+    else if(timestamp - last_info_time > 10) {
+        last_info_time = timestamp;
+        return MessageChain().Plain("技能正在冷却中...还有"+duration_to_string(60 - (timestamp - last_time), false));
     }
     return nullopt;
 }
