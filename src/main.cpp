@@ -1,8 +1,6 @@
 #include <iostream>
 #include "robot.hpp"
-#include <map>
-#include <mirai.h>
-#include <fstream>
+#include "utils.hpp"
 using namespace std;
 using namespace Cyan;
 
@@ -11,9 +9,6 @@ int main()
 	CAORobot robot;
 	try {
 		robot.init();
-	}
-	catch(const char* s) {
-		cout << s << endl;
 	}
 	catch(...) {
 		cout << "sth wrong" << endl;

@@ -1,4 +1,11 @@
+/*** 
+ * @Author       : KnightZJ
+ * @LastEditTime : 2022-02-10 15:24:19
+ * @LastEditors  : KnightZJ
+ * @Description  : 
+ */
 #include "utils.hpp"
+#include <iostream>
 
 const char* en[] = {"s", "m", "h", "d"};
 const char* ch[] = {"秒", "分", "小时", "天"};
@@ -62,4 +69,77 @@ string get_time() {
     time_t now_c = time(0);
     tm now_tm = *localtime(&now_c);
     return add_zero(now_tm.tm_hour)+":"+add_zero(now_tm.tm_min)+":"+add_zero(now_tm.tm_sec);
+}
+
+char* cds = "3456789xJQKA2";
+
+string cards_to_string(cards cs) {
+    string str="";
+    for(int i = 0; i < 15; ++i) {
+        cards res = (0x1000100010001ULL << i) & cs;
+        if(res) {
+            string cd="";
+            switch(i) {
+                case 7: cd = "10"; break;
+                case 13: cd = "小王"; break;
+                case 14: cd = "大王"; break;
+                default: cd.push_back(cds[i]);
+            }
+            int repeat = 0;
+            if(res < 0x8000)
+                repeat = 1;
+            else if(res < 0x80000000)
+                repeat = 2;
+            else if(res < 0x800000000000)
+                repeat = 3;
+            else
+                repeat = 4;
+            for(int j = 0; j < repeat; ++j) {
+                str+="["+cd+"]";
+            }
+        }
+    }
+    return str;
+}
+
+string group_type_to_string(CardGroupType cgt) {
+    return string(strCardGroupType[cgt]);
+}
+
+int deal(string s, cards *hand, cards *dealed) {
+    cards copyhand = *hand;
+    for(int i = 0; i < s.length();++i) {
+        int offset = 0;
+        switch(s[i]) {
+            case '3': offset = 0; break;
+            case '4': offset = 1; break;
+            case '5': offset = 2; break;
+            case '6': offset = 3; break;
+            case '7': offset = 4; break;
+            case '8': offset = 5; break;
+            case '9': offset = 6; break;
+            case 'J':
+            case 'j': offset = 8; break;
+            case 'Q':
+            case 'q': offset = 9; break;
+            case 'K':
+            case 'k': offset = 10; break;
+            case 'A':
+            case 'a': offset = 11; break;
+            case '2': offset = 12; break;
+            default:
+                string sub = s.substr(i);
+                if(sub.find("10") == 0) { offset = 7; i+=string("10").length()-1;}
+                else if(sub.find("小王") == 0) { offset = 13; i+=string("小王").length()-1;}
+                else if(sub.find("大王") == 0) { offset = 14; i+=string("大王").length()-1;}
+                else
+                    return 0;
+        }
+        if(!can_take(copyhand,(CardType)offset))
+            return 0;
+        take(&copyhand, (CardType)offset);
+        add(dealed, (CardType)offset);
+    }
+    *hand = copyhand;
+    return 1;
 }
