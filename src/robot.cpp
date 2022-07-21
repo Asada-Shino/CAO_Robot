@@ -12,3 +12,7 @@ void CAORobot::init() {
 void CAORobot::release() {
 	module.release();
 }
+
+void CAORobot::checkSchedule() {
+	module.checkSchedule();
+}

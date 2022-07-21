@@ -1,197 +1,239 @@
 /*
  * @Author       : KnightZJ
- * @LastEditTime : 2022-02-10 12:01:51
+ * @LastEditTime : 2022-02-20 15:41:49
  * @LastEditors  : KnightZJ
  * @Description  : poker source file
  */
+
 #include "poker.hpp"
-#include <iostream>
+#include <assert.h>
+#include <stdlib.h>
+#include <time.h>
 
-const bits64 FOUR_MASK  = 0x1fff000000000000ULL;
-const bits64 THREE_MASK = 0x00001fff00000000ULL;
-const bits64 TWO_MASK   = 0x000000001fff0000ULL;
-const bits64 ONE_MASK   = 0x0000000000007fffULL;
+const Card cSingle[15] = {
+    0x1, 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80, 0x100, 0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000
+};
 
-const cards RedJoker    = 0x4000ULL;
-const cards BlackJoker  = 0x2000ULL; 
-const cards FullCards   = 0x1fff000000006000ULL;
+const CardsGroup cgSingleCardMask[15] = {
+    0x1000100010001, 0x2000200020002, 0x4000400040004, 0x8000800080008,
+    0x10001000100010, 0x20002000200020, 0x40004000400040, 0x80008000800080,
+    0x100010001000100, 0x200020002000200, 0x400040004000400, 0x800080008000800,
+    0x1000100010001000, 0x2000, 0x4000
+};
 
+const CardsGroup cgCardNumMask[5] = {
+    0x0, 0x1, 0x10001, 0x100010001, 0x1000100010001
+};
+
+const CardsGroup cgCardsRowMask[4] = {
+    0x7fff, 0x1fff0000, 0x1fff00000000, 0x1fff000000000000
+};
+
+const CardsGroup cgFullMask = 0x1fff1fff1fff7fff;
+
+const char* strCardType[15] = {
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "J",
+    "Q",
+    "K",
+    "A",
+    "2",
+    "小王",
+    "大王"
+};
 
 const char* strCardGroupType[15] = {
-    "非法牌型",
+    "非法牌型❌",
     "单张",
     "对子",
     "三张",
-    "炸弹",
-    "王炸",
     "三带一",
     "三带一对",
+    "炸弹💣",
+    "王炸🚀",
     "四带二",
     "四带两对",
     "顺子",
     "连对",
-    "飞机",
-    "飞机带单",
-    "飞机带对"
+    "飞机✈",
+    "飞机✈带单",
+    "飞机✈带双"
 };
 
+const char* strJudgeRes[5] = {
+    "牌型不一致",
+    "非法牌型",
+    "压得过",
+    "压不过",
+    "未知错误"
+};
 
+int count_single_card(CardsGroup cardsgroup, CardType cardtype) {
+    return count_all_cards(cardsgroup & cgSingleCardMask[cardtype]);
+}
 
-
-cards ones(cards cs) { return cs & ONE_MASK; }
-cards twos(cards cs) { return (cs & TWO_MASK) >> 16; }
-cards threes(cards cs) { return (cs & THREE_MASK) >> 32; }
-cards fours(cards cs) { return (cs & FOUR_MASK) >> 48; }
-
-int count(bits64 bits) {
-    int cnt = 0;
-    while(bits != 0) {
-        ++cnt;
-        bits &= (bits - 1);
+int count_all_cards(CardsGroup cardsgroup) {
+    int res = 0;
+    while(cardsgroup) {
+        cardsgroup &= (cardsgroup - 1);
+        ++res;
     }
-    return cnt;
+    return res;
 }
 
-int count_cards(cards cs) {
-    cards one = ones(cs), two = twos(cs), three = threes(cs), four = fours(cs);
-    return count(one) + count(two)*2 + count(three)*3 + count(four)*4;
+int can_take_card(CardsGroup cardsgroup, CardType cardtype, int num) {
+    assert(num > 0 && num <= 4);
+    return count_single_card(cardsgroup, cardtype) >= num;
 }
 
-cards check_sequence(cards cs, int length) {
-    cards test = (1<<length)-1;
+int take_card(CardsGroup* cardsgroup, CardType cardtype, int num) {
+    if(!can_take_card(*cardsgroup, cardtype, num))
+        return 0;
+    *cardsgroup = (*cardsgroup & ~cgSingleCardMask[cardtype]) | 
+                (cgCardNumMask[count_single_card(*cardsgroup, cardtype) - num] << cardtype);
+    return 1;
+}
+
+int can_add_card(CardsGroup cardsgroup, CardType cardtype, int num) {
+    assert(num > 0 && num <= 4);
+    if(cardtype >= c_BlackJoker)
+        return num <= 1 && count_single_card(cardsgroup, cardtype) < num;
+    return count_single_card(cardsgroup, cardtype) <= 4 - num;
+}
+
+int add_card(CardsGroup* cardsgroup, CardType cardtype, int num) {
+    if(!can_add_card(*cardsgroup, cardtype, num))
+        return 0;
+    *cardsgroup = (*cardsgroup & ~cgSingleCardMask[cardtype]) | 
+                (cgCardNumMask[count_single_card(*cardsgroup, cardtype) + num] << cardtype);
+    return 1;
+}
+
+int can_move_card(CardsGroup dest, CardsGroup source, CardType cardtype, int num) {
+    return can_take_card(source, cardtype, num) && can_add_card(dest, cardtype, num);
+}
+
+int move_card(CardsGroup* dest, CardsGroup* source, CardType cardtype, int num) {
+    if(!can_move_card(*dest, *source, cardtype, num))
+        return 0;
+    return take_card(source, cardtype, num) && add_card(dest, cardtype, num);
+}
+
+CardsGroup check_sequence(CardsGroup cards, int len) {
+    CardsGroup test = (1<<len)-1;
     while(test <= 0xfffULL) {
-        if((test & cs) == test)
+        if((test & cards) == test)
             return test;
         test <<= 1;
     }
     return 0;
 }
 
-CardGroupType type(cards cs) {
-    cards one = ones(cs), two = twos(cs), three = threes(cs), four = fours(cs);
-    int singles = count(one), doubles = count(two);
-    int cnt = singles + doubles*2 + count(three)*3 + count(four)*4;
-    if(cnt >= 5 && cnt <= 13 && check_sequence(one, cnt))
-        return Sequence;
-    if(cnt % 2 == 0 && cnt >= 6 && cnt <= 20 && check_sequence(two, cnt >> 1))
-        return DoubleSequence;
-    if(cnt % 3 == 0 && cnt >= 6 && cnt <= 18 && check_sequence(three, cnt / 3))
-        return Airplane;
+CardsGroupInfo get_cards_info(CardsGroup cards) {
+    if(cards&~cgFullMask) {
+        return (CardsGroupInfo){.type = cg_Invalid};
+    }
+    CardsGroup singles = (cards & cgCardsRowMask[0]), doubles = (cards & cgCardsRowMask[1]) >> 16,
+                threes = (cards & cgCardsRowMask[2]) >> 32, fours = (cards & cgCardsRowMask[3]) >> 48;
+    if(((fours^threes)&fours) || ((threes^doubles)&threes) || ((doubles^singles)&doubles))
+        return (CardsGroupInfo){.type = cg_Invalid};
+    singles ^= doubles, doubles ^= threes, threes ^= fours;
+    int cnt = count_all_cards(cards), cntSingle = count_all_cards(singles),
+        cntDouble = count_all_cards(doubles), cntThree = count_all_cards(threes);
+    if(cnt >= 5 && cnt <= 13 && check_sequence(singles, cnt))
+        return (CardsGroupInfo){.type = cg_Sequence, .sequence_cnt = cnt, .sequence = singles};
+    if(cnt % 2 == 0 && cnt >= 6 && cnt <= 20 && check_sequence(doubles, cnt / 2))
+        return (CardsGroupInfo){.type = cg_DoubleSequence, .sequence_cnt = cnt / 2, .sequence = doubles};
+    if(cnt % 3 == 0 && cnt >= 6 && cnt <= 18 && check_sequence(threes, cnt / 3))
+        return (CardsGroupInfo){.type = cg_Airplane, .sequence_cnt = cnt / 3, .sequence = threes};
     switch(cnt) {
         case 1:
-            return Single;
+            return (CardsGroupInfo){.type = cg_Single, .sequence_cnt = 1, .sequence = singles};
         case 2:
-            if(two) return Double;
-            if((cs & RedJoker) && (cs & BlackJoker)) return KingBomb;
+            if(doubles) return (CardsGroupInfo){.type = cg_Double, .sequence_cnt = 1, .sequence = doubles};
+            if((singles & cSingle[c_BlackJoker]) && (singles & cSingle[c_RedJoker]))
+                return (CardsGroupInfo){.type = cg_KingBomb};
             break;
         case 3:
-            if(three) return Three;
+            if(threes) return (CardsGroupInfo){.type = cg_Three, .sequence_cnt = 1, .sequence = threes};
             break;
         case 4:
-            if(four) return Bomb;
-            if(three && one) return ThreeWithSingle;
+            if(fours) return (CardsGroupInfo){.type = cg_Bomb, .sequence_cnt = 1, .sequence = fours};
+            if(threes && singles)
+                return (CardsGroupInfo){.type = cg_ThreeWithSingle, .sequence_cnt = 1, .sequence = threes};
             break;
         case 5:
-            if(three && two) return ThreeWithDouble;
+            if(threes && doubles)
+                return (CardsGroupInfo){.type = cg_ThreeWithDouble, .sequence_cnt = 1, .sequence = threes};
             break;
         case 6:
-            if(four && (doubles * 2 + singles == 2)) return FourWithSingles;
+            if(fours && (cntDouble * 2 + cntSingle == 2))
+                return (CardsGroupInfo){.type = cg_FourWithSingles, .sequence_cnt = 1, .sequence = fours};
             break;
         case 8:
-            if(four && (doubles == 2)) return FourWithDoubles;
-            if(check_sequence(three, 2) && doubles * 2 + singles == 2) return AirplaneWithSingles;
+            if(fours && (cntDouble == 2))
+                return (CardsGroupInfo){.type = cg_FourWithDoubles, .sequence_cnt = 1, .sequence = fours};
+            if(check_sequence(threes, 2) && cntDouble * 2 + cntSingle == 2)
+                return (CardsGroupInfo){.type = cg_AirplaneWithSingles, .sequence_cnt = 2, .sequence = threes};
             break;
         case 10:
-            if(check_sequence(three, 2) && doubles == 2) return AirplaneWithDoubles;
+            if(check_sequence(threes, 2) && cntDouble == 2)
+                return (CardsGroupInfo){.type = cg_AirplaneWithDoubles, .sequence_cnt = 2, .sequence = threes};
             break;
         case 12:
-            if(check_sequence(three, 3) && !check_sequence(three, 4) && (count(three) - 3)*3 + doubles * 2 + singles == 3)
-                return AirplaneWithSingles;
+            if(check_sequence(threes, 3) && !check_sequence(threes, 4)&& (cntThree - 3)*3 + cntDouble * 2 + cntSingle == 3)
+                return (CardsGroupInfo){.type = cg_AirplaneWithSingles, .sequence_cnt = 3, .sequence = check_sequence(threes, 3)};
             break;
         case 15:
-            if(check_sequence(three, 3) && doubles == 3) return AirplaneWithDoubles;
+            if(check_sequence(threes, 3) && cntDouble == 3)
+                return (CardsGroupInfo){.type = cg_AirplaneWithDoubles, .sequence_cnt = 3, .sequence = threes};
             break;
         case 16:
-            if(check_sequence(three, 4) && !check_sequence(three, 5) && (count(three) - 3)*3 + doubles * 2 + singles == 4)
-                return AirplaneWithSingles;
+            if(check_sequence(threes, 4) && !check_sequence(threes, 5) && (cntThree - 4)*3 + cntDouble * 2 + cntSingle == 4)
+                return (CardsGroupInfo){.type = cg_AirplaneWithSingles, .sequence_cnt = 4, .sequence = check_sequence(threes, 4)};
             break;
         case 20:
-            if(check_sequence(three, 4) && doubles == 4) return AirplaneWithDoubles;
-            if(check_sequence(three, 5) && !check_sequence(three, 6) && (count(three) - 3)*3 + doubles * 2 + singles == 5)
-                return AirplaneWithSingles;
+            if(check_sequence(threes, 4) && doubles == 4)
+                return (CardsGroupInfo){.type = cg_AirplaneWithDoubles, .sequence_cnt = 4, .sequence = threes};
+            if(check_sequence(threes, 5) && !check_sequence(threes, 6) && (cntThree - 5)*3 + cntDouble * 2 + cntSingle == 5)
+                return (CardsGroupInfo){.type = cg_AirplaneWithDoubles, .sequence_cnt = 5, .sequence = check_sequence(threes, 5)};;
             break;
     }
-    return Illegal;
+    return (CardsGroupInfo){.type = cg_Invalid};
 }
 
-int judge(cards last, cards hand) {
-    CardGroupType last_type = type(last), hand_type = type(hand);
-    if(last_type == KingBomb)
-        return 0;
-    if(hand_type == KingBomb)
-        return 1;
-    if(hand_type == Bomb)
-        return (last_type == Bomb && last > hand) ? 0 : 1;
-    if(hand_type == Illegal || hand_type != last_type || count(last) != count(hand))
-        return -1;
-    switch(last_type) {
-        case Single:
-        case Double:
-        case Three:
-        case Sequence:
-        case DoubleSequence:
-        case Airplane:
-            return hand > last;
-        case ThreeWithSingle:
-        case ThreeWithDouble:
-        case AirplaneWithDoubles:
-            return threes(hand) > threes(last);
-        case FourWithSingles:
-        case FourWithDoubles:
-            return fours(hand) > fours(last);
-        case AirplaneWithSingles:
-            for(int i = 5; i >= 2; --i) {
-                cards last_res = check_sequence(last, i);
-                cards hand_res = check_sequence(hand, i);
-                if(last_res != 0 || hand_res != 0)
-                    return hand_res > last_res;
-            }
+JudgeRes judge(CardsGroup last, CardsGroup challenger) {
+    CardsGroupInfo last_info = get_cards_info(last), challenger_info = get_cards_info(challenger);
+    if(last_info.type == cg_Invalid)
+        return jr_Unexpected;
+    if(challenger_info.type == cg_Invalid)
+        return jr_InvalidInput;
+    if(last_info.type == cg_KingBomb)
+        return jr_Smaller;
+    if(challenger_info.type == cg_KingBomb)
+        return jr_Bigger;
+    if(challenger_info.type == cg_Bomb) {
+        if(last_info.type == cg_Bomb)
+            return challenger_info.sequence > last_info.sequence ? jr_Bigger : jr_Smaller;
+        return jr_Bigger;
     }
-    return -2;
+    if(challenger_info.type != last_info.type)
+        return jr_WrongMatch;
+    if(challenger_info.sequence_cnt != last_info.sequence_cnt)
+        return jr_WrongMatch;
+    return challenger_info.sequence > last_info.sequence ? jr_Bigger : jr_Smaller; 
 }
 
-cards can_take(cards cs, CardType ct) {
-    if(ct >= _BlackJoker)
-        return cs & (1ULL << ct);
-    return cs & (0x1000100010001ULL << ct);
-}
-
-int can_add(cards cs, CardType ct) {
-    if(ct >= _BlackJoker)
-        return !(cs & (1ULL << ct));
-    return !(cs & (0x1000000000000ULL << ct));
-}
-
-
-int take(cards* cs, CardType ct) {
-    cards mask = 0x1000100010001ULL << ct;
-    *cs = (~mask & *cs) | ((*cs & mask) >> 16);
-    return 1;
-}
-
-
-int add(cards* cs, CardType ct) {
-    cards mask = 0x1000100010001ULL << ct;
-    if((mask & *cs) == 0)
-        *cs |= 1ULL << ct;
-    else
-        *cs = (~mask & *cs) | ((mask & *cs) << 16);
-    return 1;
-}
-
-void shuffle(cards cds[3], cards *landlord) {
+int shuffle(CardsGroup cards[3], CardsGroup* landlord_cards) {
     srand(time(0));
-    int a[54];
+    char a[54];
     for(int i = 0; i < 54; ++i)
         a[i] = i;
     for(int i = 0; i < 54; ++i) {
@@ -200,20 +242,111 @@ void shuffle(cards cds[3], cards *landlord) {
         a[i] = a[random];
         a[random] = num;
     }
+    *landlord_cards = cards[0] = cards[1] = cards[2] = 0;
     for(int i = 0; i < 51; ++i)
-        add(&cds[i/17], (CardType)(a[i] >= 52 ? a[i]-52+13 : a[i]/4));
+        add_card(&cards[i/17],(CardType)(a[i] >= 52 ? a[i] - 52 + 13 : a[i] / 4), 1);
     for(int i = 51; i < 54; ++i)
-        add(landlord, (CardType)(a[i] >= 52 ? a[i]-52+13 : a[i]/4));
+        add_card(landlord_cards, (CardType)(a[i] >= 52 ? a[i] - 52 + 13 : a[i] / 4), 1);
+    return 1;
 }
 
-int add_cards(cards* dest, cards* source) {
-    while(*source != 0ULL) {
+CardsGroup recommend_cards(CardsGroup last, CardsGroup hand, int seconds_limit) {
+    int cnt = count_all_cards(last);
+    CardsGroup res = 0, x = (1ULL<<cnt) - 1, boom_res = 0, max = 0x2000000000000000;
+    if(last == 0) {
         for(int i = 0; i < 15; ++i) {
-            if(can_take(*source, (CardType)i)) {
-                take(source, (CardType)i);
-                add(dest, (CardType)i);
+            for(int j = 4; j >= 1; --j) {
+                if(can_take_card(hand, (CardType)i, j)) {
+                    add_card(&res,  (CardType)i, j);
+                    return res;
+                }
             }
         }
     }
+    CardsGroupInfo last_info = get_cards_info(last);
+    if(last_info.type == cg_Invalid || last_info.type == cg_KingBomb)
+        return 0;
+    
+    time_t start = time(0);
+    while(x < max && time(0) - start <= seconds_limit) {
+        CardsGroup b = x & -x;
+        CardsGroup t = x + b;
+        CardsGroup c = t ^ (t-1);
+        CardsGroup m = (c >> 2) / b;
+        x = t | m;
+        if((x & hand) == x) {
+            switch (judge(last, x)) {
+                case jr_Bigger: {
+                    CardsGroupInfo info = get_cards_info(x);
+                    if(res == 0) {
+                        if(info.type != last_info.type) {
+                            if(boom_res==0)
+                                boom_res = x;
+                            else
+                                if(judge(boom_res, x) == jr_Smaller)
+                                    boom_res = x;
+                        }
+                        else {
+                            res = x;
+                        }
+                    }
+                    else {
+                        if(judge(res, x) == jr_Smaller)
+                            res = x;
+                    }
+                    if(info.type != last_info.type) {
+                        if(boom_res==0)
+                            boom_res = x;
+                        else
+                            if(judge(boom_res, x) == jr_Bigger)
+                                boom_res = x;
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+        
+    }
+    if(res != 0)
+        return res;
+    if(boom_res != 0)
+        return boom_res;
+    for(int i = 0; i < 13; ++i) {
+        if(can_take_card(hand, (CardType)i, 4)) {
+            add_card(&res, (CardType)i, 4);
+            if(judge(last, res) != jr_Bigger) {
+                res = 0;
+                continue;
+            }
+            return res;
+        }
+    }
+    if(can_take_card(hand, c_BlackJoker, 1) && can_take_card(hand, c_RedJoker, 1)) {
+        add_card(&res, c_BlackJoker, 1);
+        add_card(&res, c_RedJoker, 1);
+        return res;
+    }
+    //
     return 0;
+}
+
+void add_cards(CardsGroup* dest, CardsGroup* source) {
+    while(count_all_cards(*source) > 0) {
+        for(int i = 0 ; i < 15; ++i) {
+            move_card(dest, source, (CardType)i, 1);
+        }
+    }
+}
+
+void take_cards(CardsGroup* dest, CardsGroup source) {
+    while(count_all_cards(source) > 0) {
+        for(int i = 0 ; i < 15; ++i) {
+            if(can_take_card(source, (CardType)i, 1)) {
+                take_card(dest, (CardType)i, 1);
+                take_card(&source, (CardType)i, 1);
+            }
+        }
+    }
 }

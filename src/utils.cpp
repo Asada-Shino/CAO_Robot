@@ -1,11 +1,14 @@
 /*** 
  * @Author       : KnightZJ
- * @LastEditTime : 2022-02-10 15:24:19
- * @LastEditors  : KnightZJ
+ * @LastEditTime : 2022-05-20 23:05:37
+ * @LastEditors  : Please set LastEditors
  * @Description  : 
  */
 #include "utils.hpp"
 #include <iostream>
+#include <sstream>
+#include <ctime>
+#include <iomanip>
 
 const char* en[] = {"s", "m", "h", "d"};
 const char* ch[] = {"秒", "分", "小时", "天"};
@@ -73,10 +76,10 @@ string get_time() {
 
 char* cds = "3456789xJQKA2";
 
-string cards_to_string(cards cs) {
+string cards_to_string(CardsGroup cs) {
     string str="";
     for(int i = 0; i < 15; ++i) {
-        cards res = (0x1000100010001ULL << i) & cs;
+        CardsGroup res = (0x1000100010001ULL << i) & cs;
         if(res) {
             string cd="";
             switch(i) {
@@ -102,12 +105,12 @@ string cards_to_string(cards cs) {
     return str;
 }
 
-string group_type_to_string(CardGroupType cgt) {
+string group_type_to_string(CardsGroupType cgt) {
     return string(strCardGroupType[cgt]);
 }
 
-int deal(string s, cards *hand, cards *dealed) {
-    cards copyhand = *hand;
+int deal(string s, CardsGroup *hand, CardsGroup *dealed) {
+    CardsGroup copyhand = *hand;
     for(int i = 0; i < s.length();++i) {
         int offset = 0;
         switch(s[i]) {
@@ -135,11 +138,27 @@ int deal(string s, cards *hand, cards *dealed) {
                 else
                     return 0;
         }
-        if(!can_take(copyhand,(CardType)offset))
+        if(!can_take_card(copyhand,(CardType)offset, 1))
             return 0;
-        take(&copyhand, (CardType)offset);
-        add(dealed, (CardType)offset);
+        take_card(&copyhand, (CardType)offset, 1);
+        add_card(dealed, (CardType)offset, 1);
     }
     *hand = copyhand;
     return 1;
+}
+
+time_t datetime_to_timestamp(string s) {
+    std::tm t{};
+    std::istringstream ss(s);
+    if(s.length() == 11)
+        s = "2022/"+s+":00";
+    else if(s.length() == 14)
+        s = "2022/" + s;
+    else if(s.length() == 16)
+        s += ":00";
+    ss >> std::get_time(&t, "%Y/%m/%d-%H:%M:%S");
+    if (ss.fail()) {
+        throw std::runtime_error{"failed to parse time string"};
+    }   
+    return  mktime(&t);
 }
